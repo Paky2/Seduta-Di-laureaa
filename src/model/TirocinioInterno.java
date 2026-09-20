@@ -1,14 +1,14 @@
 package model;
 
-public class TirocinioInterno extends model.Tirocinio {
+public class TirocinioInterno extends Tirocinio {
 
     public TirocinioInterno() {
         super();
     }
 
     public TirocinioInterno(int id, String argomento,
-                            model.Docente docenteResponsabile,
-                            model.StatoTirocinio stato) {
+                            Docente docenteResponsabile,
+                            StatoTirocinio stato) {
         super(id, argomento, docenteResponsabile, stato);
     }
 }

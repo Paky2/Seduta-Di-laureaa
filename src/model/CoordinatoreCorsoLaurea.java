@@ -1,6 +1,6 @@
 package model;
 
-public class CoordinatoreCorsoLaurea extends model.Docente {
+public class CoordinatoreCorsoLaurea extends Docente {
 
     public CoordinatoreCorsoLaurea() {
         super();

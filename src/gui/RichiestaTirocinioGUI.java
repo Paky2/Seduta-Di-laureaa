@@ -1,200 +1,187 @@
-package ImplementazionePostgresDAO;
+package gui;
 
-import Database.Database;
-import dao.RichiestaTirocinioDAO;
+import com.intellij.uiDesigner.core.GridConstraints;
+import com.intellij.uiDesigner.core.GridLayoutManager;
+import com.intellij.uiDesigner.core.Spacer;
+import controller.Controller;
 import model.Docente;
 import model.RichiestaTirocinio;
 import model.StatoRichiesta;
 import model.Studente;
 import model.Tirocinio;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.util.ArrayList;
+import javax.swing.*;
+import java.awt.*;
 import java.util.List;
 
-public class PostgresRichiestaTirocinioDAO
-        implements RichiestaTirocinioDAO {
+public class RichiestaTirocinioGUI {
 
-    private Database database;
+    private JPanel mainPanel;
 
-    public PostgresRichiestaTirocinioDAO() {
-        database = new Database();
+    private JList<String> tirociniList;
+    private JButton inviaButton;
+    private JButton chiudiButton;
+
+    private Controller controller;
+    private String loginStudente;
+
+    private List<Tirocinio> tirocini;
+
+    public RichiestaTirocinioGUI(String loginStudente) {
+
+        this.loginStudente = loginStudente;
+
+        controller = new Controller();
+
+        caricaTirocini();
+
+        inviaButton.addActionListener(
+                e -> inviaRichiesta()
+        );
+
+        chiudiButton.addActionListener(
+                e -> chiudiFinestra()
+        );
     }
 
-    @Override
-    public void SalvaRichiesta(RichiestaTirocinio richiesta) {
+    private void caricaTirocini() {
 
-        String sql = """
-                INSERT INTO richiesta_tirocinio
-                (stato, matricola_studente, id_tirocinio, id_docente)
-                VALUES (?::stato_richiesta, ?, ?, ?)
-                """;
+        tirocini = controller.ListaTirocini();
 
-        try (Connection connection = database.GetConnection();
-             PreparedStatement statement =
-                     connection.prepareStatement(sql)) {
+        DefaultListModel<String> model =
+                new DefaultListModel<>();
 
-            statement.setString(
-                    1,
-                    richiesta.getStato().name()
+        for (Tirocinio tirocinio : tirocini) {
+
+            String testo =
+                    "ID: " + tirocinio.getId()
+                            + " - "
+                            + tirocinio.getArgomento();
+
+            model.addElement(testo);
+        }
+
+        if (tirocini.isEmpty()) {
+
+            model.addElement(
+                    "Nessun tirocinio disponibile."
+            );
+        }
+
+        tirociniList.setModel(model);
+    }
+
+    private void inviaRichiesta() {
+
+        int indice =
+                tirociniList.getSelectedIndex();
+
+        if (indice < 0
+                || tirocini.isEmpty()
+                || indice >= tirocini.size()) {
+
+            JOptionPane.showMessageDialog(
+                    mainPanel,
+                    "Seleziona un tirocinio.",
+                    "Errore",
+                    JOptionPane.ERROR_MESSAGE
             );
 
-            statement.setString(
-                    2,
-                    richiesta.getStudente().getMatricola()
+            return;
+        }
+
+        Studente studente =
+                controller.OttieniStudente(loginStudente);
+
+        if (studente == null) {
+
+            JOptionPane.showMessageDialog(
+                    mainPanel,
+                    "Studente non trovato.",
+                    "Errore",
+                    JOptionPane.ERROR_MESSAGE
             );
 
-            statement.setInt(
-                    3,
-                    richiesta.getTirocinio().getId()
-            );
+            return;
+        }
 
-            statement.setInt(
-                    4,
-                    richiesta.getDocente().getIdDocente()
-            );
+        Tirocinio tirocinio =
+                tirocini.get(indice);
 
-            statement.executeUpdate();
+        Docente docente =
+                tirocinio.getDocenteResponsabile();
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        RichiestaTirocinio richiesta =
+                new RichiestaTirocinio(
+                        0,
+                        StatoRichiesta.PENDENTE,
+                        studente,
+                        tirocinio,
+                        docente
+                );
+
+        controller.RichiestaTirocinio(richiesta);
+
+        JOptionPane.showMessageDialog(
+                mainPanel,
+                "Richiesta inviata correttamente."
+        );
+
+        chiudiFinestra();
+    }
+
+    private void chiudiFinestra() {
+
+        Window window =
+                SwingUtilities.getWindowAncestor(mainPanel);
+
+        if (window != null) {
+            window.dispose();
         }
     }
 
-    @Override
-    public List<RichiestaTirocinio> ListaRichieste() {
-
-        return eseguiListaRichieste(null);
+    public JPanel getMainPanel() {
+        return mainPanel;
     }
 
-    @Override
-    public List<RichiestaTirocinio> ListaRichiestePerStato(
-            StatoRichiesta stato) {
-
-        return eseguiListaRichieste(stato);
+    {
+// GUI initializer generated by IntelliJ IDEA GUI Designer
+// >>> IMPORTANT!! <<<
+// DO NOT EDIT OR ADD ANY CODE HERE!
+        $$$setupUI$$$();
     }
 
-    private List<RichiestaTirocinio> eseguiListaRichieste(
-            StatoRichiesta stato) {
-
-        List<RichiestaTirocinio> lista =
-                new ArrayList<>();
-
-        String sql = """
-                SELECT id,
-                       stato,
-                       matricola_studente,
-                       id_tirocinio,
-                       id_docente
-                FROM richiesta_tirocinio
-                """;
-
-        if (stato != null) {
-            sql += " WHERE stato = ?::stato_richiesta";
-        }
-
-        sql += " ORDER BY id";
-
-        try (Connection connection = database.GetConnection();
-             PreparedStatement statement =
-                     connection.prepareStatement(sql)) {
-
-            if (stato != null) {
-                statement.setString(
-                        1,
-                        stato.name()
-                );
-            }
-
-            ResultSet resultSet =
-                    statement.executeQuery();
-
-            while (resultSet.next()) {
-
-                RichiestaTirocinio richiesta =
-                        new RichiestaTirocinio();
-
-                richiesta.setId(
-                        resultSet.getInt("id")
-                );
-
-                richiesta.setStato(
-                        StatoRichiesta.valueOf(
-                                resultSet.getString("stato")
-                        )
-                );
-
-                Studente studente =
-                        new Studente();
-
-                studente.setMatricola(
-                        resultSet.getString(
-                                "matricola_studente"
-                        )
-                );
-
-                Tirocinio tirocinio =
-                        new Tirocinio();
-
-                tirocinio.setId(
-                        resultSet.getInt(
-                                "id_tirocinio"
-                        )
-                );
-
-                Docente docente =
-                        new Docente();
-
-                docente.setIdDocente(
-                        resultSet.getInt(
-                                "id_docente"
-                        )
-                );
-
-                richiesta.setStudente(studente);
-                richiesta.setTirocinio(tirocinio);
-                richiesta.setDocente(docente);
-
-                lista.add(richiesta);
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return lista;
+    /**
+     * Method generated by IntelliJ IDEA GUI Designer
+     * >>> IMPORTANT!! <<<
+     * DO NOT edit this method OR call it in your code!
+     *
+     * @noinspection ALL
+     */
+    private void $$$setupUI$$$() {
+        mainPanel = new JPanel();
+        mainPanel.setLayout(new GridLayoutManager(5, 2, new Insets(0, 0, 0, 0), -1, -1));
+        final Spacer spacer1 = new Spacer();
+        mainPanel.add(spacer1, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        final JLabel label1 = new JLabel();
+        label1.setText("Seleziona un tirocinio ");
+        mainPanel.add(label1, new GridConstraints(0, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        final JScrollPane scrollPane1 = new JScrollPane();
+        mainPanel.add(scrollPane1, new GridConstraints(2, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        tirociniList = new JList();
+        scrollPane1.setViewportView(tirociniList);
+        inviaButton = new JButton();
+        inviaButton.setText("Invia richiesta");
+        mainPanel.add(inviaButton, new GridConstraints(3, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        chiudiButton = new JButton();
+        chiudiButton.setText("Chiudi");
+        mainPanel.add(chiudiButton, new GridConstraints(4, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
     }
 
-    @Override
-    public void AggiornaStato(
-            RichiestaTirocinio richiesta) {
-
-        String sql = """
-                UPDATE richiesta_tirocinio
-                SET stato = ?::stato_richiesta
-                WHERE id = ?
-                """;
-
-        try (Connection connection = database.GetConnection();
-             PreparedStatement statement =
-                     connection.prepareStatement(sql)) {
-
-            statement.setString(
-                    1,
-                    richiesta.getStato().name()
-            );
-
-            statement.setInt(
-                    2,
-                    richiesta.getId()
-            );
-
-            statement.executeUpdate();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    /**
+     * @noinspection ALL
+     */
+    public JComponent $$$getRootComponent$$$() {
+        return mainPanel;
     }
 }

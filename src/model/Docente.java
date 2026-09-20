@@ -46,4 +46,8 @@ public class Docente extends Utente {
 
     public void accettaORifiutaTesi(Tesi t) {
     }
+    @Override
+    public String toString() {
+        return getNome() + " " + getCognome();
+    }
 }
