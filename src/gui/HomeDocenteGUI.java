@@ -89,7 +89,7 @@ public class HomeDocenteGUI {
     private void apriGestioneTesi() {
 
         GestioneTesiGUI gui =
-                new GestioneTesiGUI();
+                new GestioneTesiGUI(docente);
 
         JFrame frame =
                 new JFrame("Gestione tesi");

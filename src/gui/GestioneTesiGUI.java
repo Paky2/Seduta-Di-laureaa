@@ -4,32 +4,50 @@ import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
 import controller.Controller;
+import model.Docente;
 import model.StatoTesi;
 import model.Tesi;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 
 public class GestioneTesiGUI {
 
     private JPanel mainPanel;
-
     private JList<String> tesiList;
 
     private JButton accettaButton;
     private JButton rifiutaButton;
     private JButton chiudiButton;
 
-    private Controller controller;
+    private JLabel titoloLabel;
 
-    private List<Tesi> tesi;
+    private final Controller controller;
+    private final Docente docente;
 
+    private List<Tesi> tesi =
+            new ArrayList<>();
+
+    /*
+     * Costruttore per il coordinatore:
+     * consultazione, senza pulsanti di valutazione.
+     */
     public GestioneTesiGUI() {
+        this(null);
+    }
+
+    /*
+     * Costruttore per il docente autenticato.
+     */
+    public GestioneTesiGUI(Docente docente) {
+
+        this.docente = docente;
 
         controller = new Controller();
 
-        caricaTesi();
+        creaInterfaccia();
 
         accettaButton.addActionListener(
                 e -> aggiornaTesi(true)
@@ -42,53 +60,188 @@ public class GestioneTesiGUI {
         chiudiButton.addActionListener(
                 e -> chiudiFinestra()
         );
+
+        if (docente == null) {
+
+            titoloLabel.setText(
+                    "Consultazione delle tesi già valutate"
+            );
+
+            accettaButton.setVisible(false);
+            rifiutaButton.setVisible(false);
+
+        } else {
+
+            titoloLabel.setText(
+                    "Tesi in attesa assegnate al docente "
+                            + docente.getIdDocente()
+            );
+        }
+
+        caricaTesi();
+    }
+
+    private void creaInterfaccia() {
+
+        mainPanel = new JPanel(
+                new BorderLayout(10, 10)
+        );
+
+        mainPanel.setBorder(
+                BorderFactory.createEmptyBorder(
+                        15, 15, 15, 15
+                )
+        );
+
+        titoloLabel = new JLabel("Gestione tesi");
+
+        titoloLabel.setFont(
+                titoloLabel.getFont().deriveFont(
+                        Font.BOLD,
+                        16f
+                )
+        );
+
+        tesiList = new JList<>();
+
+        tesiList.setSelectionMode(
+                ListSelectionModel.SINGLE_SELECTION
+        );
+
+        JScrollPane scrollPane =
+                new JScrollPane(tesiList);
+
+        scrollPane.setPreferredSize(
+                new Dimension(650, 260)
+        );
+
+        accettaButton = new JButton("Accetta");
+        rifiutaButton = new JButton("Rifiuta");
+        chiudiButton = new JButton("Chiudi");
+
+        JPanel pulsanti = new JPanel(
+                new FlowLayout(FlowLayout.RIGHT)
+        );
+
+        pulsanti.add(accettaButton);
+        pulsanti.add(rifiutaButton);
+        pulsanti.add(chiudiButton);
+
+        mainPanel.add(
+                titoloLabel,
+                BorderLayout.NORTH
+        );
+
+        mainPanel.add(
+                scrollPane,
+                BorderLayout.CENTER
+        );
+
+        mainPanel.add(
+                pulsanti,
+                BorderLayout.SOUTH
+        );
     }
 
     private void caricaTesi() {
 
-        tesi =
-                controller.ListaTesi();
+        try {
 
-        DefaultListModel<String> model =
-                new DefaultListModel<>();
+            if (docente != null) {
 
-        if (tesi.isEmpty()) {
+                /*
+                 * Il docente riceve soltanto le proprie
+                 * tesi IN_CORSO.
+                 */
+                tesi = controller.ListaTesiPerRelatore(
+                        docente.getIdDocente()
+                );
+
+            } else {
+
+                /*
+                 * Il coordinatore vede solo le tesi già
+                 * accettate o rifiutate.
+                 */
+                tesi = controller.ListaTesiValutate();
+            }
+
+            DefaultListModel<String> model =
+                    new DefaultListModel<>();
+
+            if (tesi.isEmpty()) {
+
+                model.addElement(
+                        docente == null
+                                ? "Nessuna tesi già valutata."
+                                : "Non ci sono tesi in attesa assegnate a te."
+                );
+
+            } else {
+
+                for (Tesi t : tesi) {
+
+                    model.addElement(
+                            "ID: " + t.getId()
+                                    + " | Matricola: "
+                                    + t.getStudente().getMatricola()
+                                    + " | File: "
+                                    + t.getFile()
+                                    + " | Versione: "
+                                    + t.getVersione()
+                                    + " | Stato: "
+                                    + t.getStato()
+                    );
+                }
+            }
+
+            tesiList.setModel(model);
+
+        } catch (Exception e) {
+
+            tesi = new ArrayList<>();
+
+            DefaultListModel<String> model =
+                    new DefaultListModel<>();
 
             model.addElement(
-                    "Nessuna tesi presente."
+                    "Errore durante il caricamento delle tesi."
             );
 
-        } else {
+            tesiList.setModel(model);
 
-            for (Tesi t : tesi) {
+            JOptionPane.showMessageDialog(
+                    mainPanel,
+                    e.getMessage(),
+                    "Errore",
+                    JOptionPane.ERROR_MESSAGE
+            );
 
-                String testo =
-                        "ID: "
-                                + t.getId()
-                                + " | Studente: "
-                                + t.getStudente().getMatricola()
-                                + " | File: "
-                                + t.getFile()
-                                + " | Versione: "
-                                + t.getVersione()
-                                + " | Stato: "
-                                + t.getStato();
-
-                model.addElement(testo);
-            }
+            e.printStackTrace();
         }
-
-        tesiList.setModel(model);
     }
 
     private void aggiornaTesi(boolean accetta) {
 
+        /*
+         * Questa schermata non permette al coordinatore
+         * di accettare o rifiutare tesi.
+         */
+        if (docente == null) {
+            JOptionPane.showMessageDialog(
+                    mainPanel,
+                    "Solo il docente tutor può valutare una tesi.",
+                    "Operazione non consentita",
+                    JOptionPane.WARNING_MESSAGE
+            );
+
+            return;
+        }
+
         int indice =
                 tesiList.getSelectedIndex();
 
-        if (indice < 0
-                || tesi.isEmpty()
-                || indice >= tesi.size()) {
+        if (indice < 0 || indice >= tesi.size()) {
 
             JOptionPane.showMessageDialog(
                     mainPanel,
@@ -100,42 +253,58 @@ public class GestioneTesiGUI {
             return;
         }
 
-        Tesi tesiSelezionata =
+        Tesi selezionata =
                 tesi.get(indice);
 
-        if (accetta) {
+        StatoTesi statoPrecedente =
+                selezionata.getStato();
 
-            tesiSelezionata.setStato(
-                    StatoTesi.ACCETTATA
-            );
-
-        } else {
-
-            tesiSelezionata.setStato(
-                    StatoTesi.RIFIUTATA
-            );
-        }
-
-        controller.AccettaORifiutaTesi(
-                tesiSelezionata
-        );
-
-        JOptionPane.showMessageDialog(
-                mainPanel,
+        selezionata.setStato(
                 accetta
-                        ? "Tesi accettata."
-                        : "Tesi rifiutata."
+                        ? StatoTesi.ACCETTATA
+                        : StatoTesi.RIFIUTATA
         );
 
-        caricaTesi();
+        try {
+
+            controller.AccettaORifiutaTesi(
+                    selezionata,
+                    docente.getIdDocente()
+            );
+
+            JOptionPane.showMessageDialog(
+                    mainPanel,
+                    accetta
+                            ? "Tesi accettata."
+                            : "Tesi rifiutata.",
+                    "Operazione completata",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            caricaTesi();
+
+        } catch (Exception e) {
+
+            selezionata.setStato(statoPrecedente);
+
+            JOptionPane.showMessageDialog(
+                    mainPanel,
+                    "Non è stato possibile valutare la tesi:\n"
+                            + e.getMessage(),
+                    "Errore",
+                    JOptionPane.ERROR_MESSAGE
+            );
+
+            e.printStackTrace();
+
+            caricaTesi();
+        }
     }
 
     private void chiudiFinestra() {
 
         Window window =
-                SwingUtilities.getWindowAncestor(
-                        mainPanel
-                );
+                SwingUtilities.getWindowAncestor(mainPanel);
 
         if (window != null) {
             window.dispose();

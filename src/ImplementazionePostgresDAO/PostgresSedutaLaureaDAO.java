@@ -72,42 +72,40 @@ public class PostgresSedutaLaureaDAO implements SedutaLaureaDAO {
     @Override
     public List<SedutaLaurea> ListaSedute() {
 
-        List<SedutaLaurea> lista =
-                new ArrayList<>();
+        List<SedutaLaurea> lista = new ArrayList<>();
 
         String sql = """
-                SELECT id, data, ora, luogo, disponibilita
-                FROM seduta_laurea
-                ORDER BY data, ora
-                """;
+            SELECT s.id,
+                   s.data,
+                   s.ora,
+                   s.luogo,
+                   (
+                       s.disponibilita = TRUE
+                       AND NOT EXISTS (
+                           SELECT 1
+                           FROM prenotazione_seduta p
+                           WHERE p.id_seduta = s.id
+                       )
+                   ) AS disponibilita
+            FROM seduta_laurea s
+            ORDER BY s.data, s.ora
+            """;
 
         try (Connection connection = database.GetConnection();
              PreparedStatement statement =
                      connection.prepareStatement(sql);
-             ResultSet resultSet =
-                     statement.executeQuery()) {
+             ResultSet resultSet = statement.executeQuery()) {
 
             while (resultSet.next()) {
 
-                SedutaLaurea seduta =
-                        new SedutaLaurea();
+                SedutaLaurea seduta = new SedutaLaurea();
 
-                seduta.setId(
-                        resultSet.getInt("id")
-                );
-
-                seduta.setData(
-                        resultSet.getDate("data")
-                );
-
+                seduta.setId(resultSet.getInt("id"));
+                seduta.setData(resultSet.getDate("data"));
                 seduta.setOra(
                         resultSet.getTime("ora").toLocalTime()
                 );
-
-                seduta.setLuogo(
-                        resultSet.getString("luogo")
-                );
-
+                seduta.setLuogo(resultSet.getString("luogo"));
                 seduta.setDisponibilita(
                         resultSet.getBoolean("disponibilita")
                 );
@@ -194,108 +192,235 @@ public class PostgresSedutaLaureaDAO implements SedutaLaureaDAO {
             SedutaLaurea seduta,
             Studente studente) {
 
-        String sqlControllo = """
-                SELECT disponibilita
-                FROM seduta_laurea
-                WHERE id = ?
-                FOR UPDATE
-                """;
+        if (seduta == null || studente == null) {
+            throw new IllegalArgumentException(
+                    "Studente o seduta non validi."
+            );
+        }
 
-        String sqlPrenotazione = """
-                INSERT INTO prenotazione_seduta
-                (matricola_studente, id_seduta)
-                VALUES (?, ?)
-                """;
-
-        String sqlDisponibilita = """
-                UPDATE seduta_laurea
-                SET disponibilita = FALSE
-                WHERE id = ?
-                """;
+        int idSeduta = seduta.getId();
+        String matricola = studente.getMatricola();
 
         Connection connection = null;
 
         try {
 
             connection = database.GetConnection();
-
             connection.setAutoCommit(false);
 
-            boolean disponibile;
+            // 1. Controlla se lo studente ha già una prenotazione.
+            List<Integer> prenotazioniPrecedenti =
+                    new ArrayList<>();
 
-            // CONTROLLO DISPONIBILITA'
+            String sqlPrenotazioniStudente = """
+                SELECT id_seduta
+                FROM prenotazione_seduta
+                WHERE matricola_studente = ?
+                FOR UPDATE
+                """;
+
             try (PreparedStatement statement =
                          connection.prepareStatement(
-                                 sqlControllo
+                                 sqlPrenotazioniStudente
                          )) {
 
-                statement.setInt(
-                        1,
-                        seduta.getId()
-                );
+                statement.setString(1, matricola);
 
-                try (ResultSet resultSet =
-                             statement.executeQuery()) {
+                try (ResultSet rs = statement.executeQuery()) {
 
-                    if (!resultSet.next()) {
+                    while (rs.next()) {
 
+                        int idPrecedente =
+                                rs.getInt("id_seduta");
+
+                        if (idPrecedente == idSeduta) {
+                            throw new IllegalStateException(
+                                    "Hai già prenotato questa seduta."
+                            );
+                        }
+
+                        prenotazioniPrecedenti.add(idPrecedente);
+                    }
+                }
+            }
+
+            // 2. Verifica che la seduta scelta esista e sia libera.
+            String sqlControlloSeduta = """
+                SELECT s.disponibilita,
+                       EXISTS (
+                           SELECT 1
+                           FROM prenotazione_seduta p
+                           WHERE p.id_seduta = s.id
+                       ) AS gia_prenotata
+                FROM seduta_laurea s
+                WHERE s.id = ?
+                FOR UPDATE
+                """;
+
+            try (PreparedStatement statement =
+                         connection.prepareStatement(
+                                 sqlControlloSeduta
+                         )) {
+
+                statement.setInt(1, idSeduta);
+
+                try (ResultSet rs = statement.executeQuery()) {
+
+                    if (!rs.next()) {
                         throw new IllegalStateException(
                                 "La seduta selezionata non esiste."
                         );
                     }
 
-                    disponibile =
-                            resultSet.getBoolean(
-                                    "disponibilita"
-                            );
+                    boolean disponibile =
+                            rs.getBoolean("disponibilita");
+
+                    boolean giaPrenotata =
+                            rs.getBoolean("gia_prenotata");
+
+                    if (!disponibile || giaPrenotata) {
+                        throw new IllegalStateException(
+                                "La seduta selezionata è già piena. "
+                                        + "Scegline un'altra."
+                        );
+                    }
                 }
             }
 
-            // SEDUTA GIA' OCCUPATA
-            if (!disponibile) {
+            // 3. Cerca una tesi accettata dello studente.
+            //    Non deve necessariamente essere già associata
+            //    alla seduta che lo studente vuole prenotare.
+            int idTesi;
 
-                throw new IllegalStateException(
-                        "La seduta selezionata è già piena."
-                );
-            }
+            String sqlTesiAccettata = """
+                SELECT id
+                FROM tesi
+                WHERE matricola_studente = ?
+                  AND stato = 'ACCETTATA'::stato_tesi
+                ORDER BY versione DESC, id DESC
+                LIMIT 1
+                FOR UPDATE
+                """;
 
-            // INSERIMENTO PRENOTAZIONE
             try (PreparedStatement statement =
                          connection.prepareStatement(
-                                 sqlPrenotazione
+                                 sqlTesiAccettata
                          )) {
 
-                statement.setString(
-                        1,
-                        studente.getMatricola()
-                );
+                statement.setString(1, matricola);
 
-                statement.setInt(
-                        2,
-                        seduta.getId()
-                );
+                try (ResultSet rs = statement.executeQuery()) {
+
+                    if (!rs.next()) {
+                        throw new IllegalStateException(
+                                "Non puoi prenotare una seduta: "
+                                        + "devi avere una tesi accettata."
+                        );
+                    }
+
+                    idTesi = rs.getInt("id");
+                }
+            }
+
+            // 4. Se lo studente aveva prenotato un'altra seduta,
+            //    libera quella precedente.
+            String sqlEliminaPrenotazioniPrecedenti = """
+                DELETE FROM prenotazione_seduta
+                WHERE matricola_studente = ?
+                  AND id_seduta <> ?
+                """;
+
+            try (PreparedStatement statement =
+                         connection.prepareStatement(
+                                 sqlEliminaPrenotazioniPrecedenti
+                         )) {
+
+                statement.setString(1, matricola);
+                statement.setInt(2, idSeduta);
 
                 statement.executeUpdate();
             }
 
-            // LA SEDUTA DIVENTA NON DISPONIBILE
+            String sqlLiberaSedutaPrecedente = """
+                UPDATE seduta_laurea
+                SET disponibilita = TRUE
+                WHERE id = ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM prenotazione_seduta p
+                      WHERE p.id_seduta = seduta_laurea.id
+                  )
+                """;
+
+            for (int idPrecedente : prenotazioniPrecedenti) {
+
+                try (PreparedStatement statement =
+                             connection.prepareStatement(
+                                     sqlLiberaSedutaPrecedente
+                             )) {
+
+                    statement.setInt(1, idPrecedente);
+                    statement.executeUpdate();
+                }
+            }
+
+            // 5. Associa la tesi accettata alla seduta selezionata.
+            String sqlAggiornaTesi = """
+                UPDATE tesi
+                SET id_seduta = ?
+                WHERE id = ?
+                  AND matricola_studente = ?
+                  AND stato = 'ACCETTATA'::stato_tesi
+                """;
+
             try (PreparedStatement statement =
                          connection.prepareStatement(
-                                 sqlDisponibilita
+                                 sqlAggiornaTesi
                          )) {
 
-                statement.setInt(
-                        1,
-                        seduta.getId()
-                );
+                statement.setInt(1, idSeduta);
+                statement.setInt(2, idTesi);
+                statement.setString(3, matricola);
 
-                int righe =
-                        statement.executeUpdate();
-
-                if (righe != 1) {
-
+                if (statement.executeUpdate() != 1) {
                     throw new IllegalStateException(
-                            "Impossibile aggiornare la disponibilità della seduta."
+                            "Impossibile associare la tesi alla seduta."
+                    );
+                }
+            }
+
+            // 6. Inserisce la nuova prenotazione.
+            String sqlInserisciPrenotazione = """
+                INSERT INTO prenotazione_seduta
+                    (matricola_studente, id_seduta)
+                VALUES (?, ?)
+                """;
+
+            try (PreparedStatement statement =
+                         connection.prepareStatement(
+                                 sqlInserisciPrenotazione
+                         )) {
+
+                statement.setString(1, matricola);
+                statement.setInt(2, idSeduta);
+                statement.executeUpdate();
+            }
+
+            // 7. Segna la seduta scelta come occupata.
+            String sqlOccupaSeduta = """
+                UPDATE seduta_laurea
+                SET disponibilita = FALSE
+                WHERE id = ?
+                """;
+
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sqlOccupaSeduta)) {
+
+                statement.setInt(1, idSeduta);
+
+                if (statement.executeUpdate() != 1) {
+                    throw new IllegalStateException(
+                            "Impossibile aggiornare la disponibilità."
                     );
                 }
             }
@@ -322,11 +447,10 @@ public class PostgresSedutaLaureaDAO implements SedutaLaureaDAO {
                 }
             }
 
-            // 23505 = violazione UNIQUE
             if ("23505".equals(e.getSQLState())) {
-
                 throw new IllegalStateException(
-                        "La seduta selezionata è già piena."
+                        "La seduta è stata prenotata nel frattempo. "
+                                + "Aggiorna la lista e scegline un'altra."
                 );
             }
 

@@ -21,8 +21,17 @@ public class RegistrazioneDocenteGUI {
     private JButton indietroButton;
 
     private Controller controller;
+    private boolean registrazioneCoordinatore;
 
     public RegistrazioneDocenteGUI() {
+        this(false);
+    }
+
+    public RegistrazioneDocenteGUI(
+            boolean registrazioneCoordinatore) {
+
+        this.registrazioneCoordinatore =
+                registrazioneCoordinatore;
 
         controller = new Controller();
 
@@ -72,17 +81,34 @@ public class RegistrazioneDocenteGUI {
 
         try {
 
-            controller.RegistrazioneDocente(
-                    nome,
-                    cognome,
-                    email,
-                    login,
-                    password
-            );
+            if (registrazioneCoordinatore) {
+
+                controller.RegistrazioneCoordinatore(
+                        nome,
+                        cognome,
+                        email,
+                        login,
+                        password
+                );
+
+            } else {
+
+                controller.RegistrazioneDocente(
+                        nome,
+                        cognome,
+                        email,
+                        login,
+                        password
+                );
+            }
+
+            String messaggio = registrazioneCoordinatore
+                    ? "Registrazione coordinatore completata."
+                    : "Registrazione docente completata.";
 
             JOptionPane.showMessageDialog(
                     mainPanel,
-                    "Registrazione docente completata.",
+                    messaggio,
                     "Registrazione",
                     JOptionPane.INFORMATION_MESSAGE
             );

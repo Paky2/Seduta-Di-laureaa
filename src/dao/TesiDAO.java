@@ -10,5 +10,16 @@ public interface TesiDAO {
 
     List<Tesi> ListaTesi();
 
-    void AggiornaStato(Tesi tesi);
+    List<Tesi> ListaTesiPerRelatore(int idDocente);
+
+    List<Tesi> ListaTesiValutate();
+
+    void AggiornaStato(Tesi tesi, int idDocente);
+
+    boolean HaRichiestaTirocinioAccettata(String matricola);
+
+    boolean HaTesiAccettataPerSeduta(
+            String matricola,
+            int idSeduta
+    );
 }

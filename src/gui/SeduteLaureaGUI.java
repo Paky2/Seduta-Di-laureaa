@@ -55,24 +55,22 @@ public class SeduteLaureaGUI {
 
         for (SedutaLaurea seduta : sedute) {
 
+            // Mostra tutte le sedute libere, non soltanto
+            // quella già associata alla tesi.
             if (seduta.isDisponibilita()) {
 
                 seduteDisponibili.add(seduta);
 
                 model.addElement(
                         "ID: " + seduta.getId()
-                                + " | Data: "
-                                + seduta.getData()
-                                + " | Ora: "
-                                + seduta.getOra()
-                                + " | Luogo: "
-                                + seduta.getLuogo()
+                                + " | Data: " + seduta.getData()
+                                + " | Ora: " + seduta.getOra()
+                                + " | Luogo: " + seduta.getLuogo()
                 );
             }
         }
 
         if (seduteDisponibili.isEmpty()) {
-
             model.addElement(
                     "Nessuna seduta disponibile."
             );
@@ -86,12 +84,11 @@ public class SeduteLaureaGUI {
         int indice =
                 seduteList.getSelectedIndex();
 
-        if (indice < 0
-                || indice >= seduteDisponibili.size()) {
+        if (indice < 0 || indice >= seduteDisponibili.size()) {
 
             JOptionPane.showMessageDialog(
                     mainPanel,
-                    "Seleziona una seduta.",
+                    "Seleziona una seduta prenotabile.",
                     "Errore",
                     JOptionPane.ERROR_MESSAGE
             );
@@ -100,9 +97,7 @@ public class SeduteLaureaGUI {
         }
 
         Studente studente =
-                controller.OttieniStudente(
-                        loginStudente
-                );
+                controller.OttieniStudente(loginStudente);
 
         if (studente == null) {
 
@@ -121,6 +116,24 @@ public class SeduteLaureaGUI {
 
         try {
 
+
+
+            if (!controller.StudenteHaTesiAccettataPerSeduta(
+                    studente.getMatricola(),
+                    seduta.getId())) {
+
+                JOptionPane.showMessageDialog(
+                        mainPanel,
+                        "Non puoi prenotare: la tesi associata "
+                                + "a questa seduta non è stata accettata.",
+                        "Prenotazione non consentita",
+                        JOptionPane.WARNING_MESSAGE
+                );
+
+                caricaSedute();
+                return;
+            }
+
             controller.PrenotaSedutaLaurea(
                     seduta,
                     studente
@@ -128,34 +141,25 @@ public class SeduteLaureaGUI {
 
             JOptionPane.showMessageDialog(
                     mainPanel,
-                    "Seduta prenotata correttamente."
+                    "Seduta prenotata correttamente.",
+                    "Successo",
+                    JOptionPane.INFORMATION_MESSAGE
             );
 
             caricaSedute();
 
         } catch (Exception e) {
 
-            String messaggio =
-                    e.getMessage();
-
-            if (messaggio == null
-                    || messaggio.isBlank()) {
-
-                messaggio =
-                        "Errore durante la prenotazione.";
-            }
-
             JOptionPane.showMessageDialog(
                     mainPanel,
-                    messaggio,
-                    "Prenotazione non effettuata",
-                    JOptionPane.WARNING_MESSAGE
+                    "Prenotazione non effettuata:\n"
+                            + e.getMessage(),
+                    "Errore",
+                    JOptionPane.ERROR_MESSAGE
             );
 
             e.printStackTrace();
 
-            // Ricarica per eliminare eventualmente
-            // la seduta che nel frattempo è diventata piena.
             caricaSedute();
         }
     }

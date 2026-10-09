@@ -83,60 +83,64 @@ public class CommissioneGUI {
     private void creaCommissione() {
 
         SedutaLaurea seduta =
-                (SedutaLaurea)
-                        sedutaComboBox
-                                .getSelectedItem();
+                (SedutaLaurea) sedutaComboBox.getSelectedItem();
 
         if (seduta == null) {
-
             JOptionPane.showMessageDialog(
                     mainPanel,
                     "Seleziona una seduta.",
                     "Errore",
                     JOptionPane.ERROR_MESSAGE
             );
-
             return;
         }
 
-        int[] indici =
-                docentiList.getSelectedIndices();
+        int[] indici = docentiList.getSelectedIndices();
 
         if (indici.length == 0) {
-
             JOptionPane.showMessageDialog(
                     mainPanel,
                     "Seleziona almeno un docente.",
                     "Errore",
                     JOptionPane.ERROR_MESSAGE
             );
-
             return;
         }
 
         Commissione commissione =
-                new Commissione(
-                        0,
-                        seduta
-                );
+                new Commissione(0, seduta);
 
         for (int indice : indici) {
-
             commissione.aggiungiDocente(
                     docenti.get(indice)
             );
         }
 
-        controller.FormaCommissione(
-                commissione
-        );
+        try {
 
-        JOptionPane.showMessageDialog(
-                mainPanel,
-                "Commissione creata correttamente."
-        );
+            controller.FormaCommissione(commissione);
 
-        chiudiFinestra();
+            JOptionPane.showMessageDialog(
+                    mainPanel,
+                    "Commissione salvata o aggiornata correttamente.",
+                    "Successo",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            chiudiFinestra();
+
+        } catch (Exception e) {
+
+            JOptionPane.showMessageDialog(
+                    mainPanel,
+                    "Impossibile salvare la commissione:\n"
+                            + e.getMessage(),
+                    "Errore",
+                    JOptionPane.ERROR_MESSAGE
+            );
+
+            e.printStackTrace();
+        }
     }
 
     private void chiudiFinestra() {

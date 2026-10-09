@@ -186,8 +186,7 @@ public class LoginGUI {
     private void apriRegistrazione() {
 
         String tipo =
-                (String)
-                        tipoUtenteComboBox.getSelectedItem();
+                (String) tipoUtenteComboBox.getSelectedItem();
 
         if ("Studente".equals(tipo)) {
 
@@ -197,22 +196,13 @@ public class LoginGUI {
             JFrame frame =
                     new JFrame("Registrazione Studente");
 
-            frame.setContentPane(
-                    gui.getMainPanel()
-            );
-
-            frame.setDefaultCloseOperation(
-                    JFrame.DISPOSE_ON_CLOSE
-            );
-
+            frame.setContentPane(gui.getMainPanel());
+            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.pack();
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
 
-            return;
-        }
-
-        if ("Docente".equals(tipo)) {
+        } else if ("Docente".equals(tipo)) {
 
             RegistrazioneDocenteGUI gui =
                     new RegistrazioneDocenteGUI();
@@ -220,14 +210,22 @@ public class LoginGUI {
             JFrame frame =
                     new JFrame("Registrazione Docente");
 
-            frame.setContentPane(
-                    gui.getMainPanel()
-            );
+            frame.setContentPane(gui.getMainPanel());
+            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            frame.pack();
+            frame.setLocationRelativeTo(null);
+            frame.setVisible(true);
 
-            frame.setDefaultCloseOperation(
-                    JFrame.DISPOSE_ON_CLOSE
-            );
+        } else if ("Coordinatore".equals(tipo)) {
 
+            RegistrazioneDocenteGUI gui =
+                    new RegistrazioneDocenteGUI(true);
+
+            JFrame frame =
+                    new JFrame("Registrazione Coordinatore");
+
+            frame.setContentPane(gui.getMainPanel());
+            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.pack();
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);

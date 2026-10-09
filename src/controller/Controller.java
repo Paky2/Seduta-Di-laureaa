@@ -32,14 +32,14 @@ import java.util.List;
 
 public class Controller {
 
-    private UtenteDAO utenteDAO;
-    private StudenteDAO studenteDAO;
-    private DocenteDAO docenteDAO;
-    private TirocinioDAO tirocinioDAO;
-    private RichiestaTirocinioDAO richiestaTirocinioDAO;
-    private TesiDAO tesiDAO;
-    private SedutaLaureaDAO sedutaLaureaDAO;
-    private CommissioneDAO commissioneDAO;
+    private final UtenteDAO utenteDAO;
+    private final StudenteDAO studenteDAO;
+    private final DocenteDAO docenteDAO;
+    private final TirocinioDAO tirocinioDAO;
+    private final RichiestaTirocinioDAO richiestaTirocinioDAO;
+    private final TesiDAO tesiDAO;
+    private final SedutaLaureaDAO sedutaLaureaDAO;
+    private final CommissioneDAO commissioneDAO;
 
     public Controller() {
 
@@ -47,19 +47,21 @@ public class Controller {
         studenteDAO = new PostgresStudenteDAO();
         docenteDAO = new PostgresDocenteDAO();
         tirocinioDAO = new PostgresTirocinioDAO();
-        richiestaTirocinioDAO = new PostgresRichiestaTirocinioDAO();
+        richiestaTirocinioDAO =
+                new PostgresRichiestaTirocinioDAO();
         tesiDAO = new PostgresTesiDAO();
         sedutaLaureaDAO = new PostgresSedutaLaureaDAO();
         commissioneDAO = new PostgresCommissioneDAO();
     }
 
-    // =========================
     // LOGIN
-    // =========================
 
-    public boolean LoginStudente(String login, String password) {
+    public boolean LoginStudente(
+            String login,
+            String password) {
 
-        Utente utente = utenteDAO.Login(login, password);
+        Utente utente =
+                utenteDAO.Login(login, password);
 
         if (utente == null) {
             return false;
@@ -68,9 +70,12 @@ public class Controller {
         return studenteDAO.TrovaStudenteDaLogin(login) != null;
     }
 
-    public boolean LoginDocente(String login, String password) {
+    public boolean LoginDocente(
+            String login,
+            String password) {
 
-        Utente utente = utenteDAO.Login(login, password);
+        Utente utente =
+                utenteDAO.Login(login, password);
 
         if (utente == null) {
             return false;
@@ -79,9 +84,12 @@ public class Controller {
         return docenteDAO.TrovaDocenteDaLogin(login) != null;
     }
 
-    public boolean LoginCoordinatore(String login, String password) {
+    public boolean LoginCoordinatore(
+            String login,
+            String password) {
 
-        Utente utente = utenteDAO.Login(login, password);
+        Utente utente =
+                utenteDAO.Login(login, password);
 
         if (utente == null) {
             return false;
@@ -91,23 +99,18 @@ public class Controller {
     }
 
     public Studente OttieniStudente(String login) {
-
         return studenteDAO.TrovaStudenteDaLogin(login);
     }
 
     public Docente OttieniDocente(String login) {
-
         return docenteDAO.TrovaDocenteDaLogin(login);
     }
 
     public Docente OttieniCoordinatore(String login) {
-
         return docenteDAO.TrovaCoordinatoreDaLogin(login);
     }
 
-    // =========================
     // REGISTRAZIONE
-    // =========================
 
     public void RegistrazioneStudente(
             String nome,
@@ -148,17 +151,32 @@ public class Controller {
         docenteDAO.SalvaDocente(docente);
     }
 
-    // =========================
-    // STUDENTE
-    // =========================
+    public void RegistrazioneCoordinatore(
+            String nome,
+            String cognome,
+            String email,
+            String login,
+            String password) {
+
+        Docente coordinatore = new Docente(
+                nome,
+                cognome,
+                email,
+                login,
+                password,
+                0
+        );
+
+        docenteDAO.SalvaCoordinatore(coordinatore);
+    }
+
+    // OPERAZIONI STUDENTE
 
     public List<Tirocinio> ListaTirocini() {
-
         return tirocinioDAO.ListaTirocini();
     }
 
     public List<Docente> ListaDocenti() {
-
         return docenteDAO.ListaDocenti();
     }
 
@@ -189,18 +207,32 @@ public class Controller {
     }
 
     public List<SedutaLaurea> ListaSedute() {
-
         return sedutaLaureaDAO.ListaSedute();
     }
 
     public void CaricaTesi(Tesi tesi) {
-
         tesiDAO.SalvaTesi(tesi);
     }
 
-    // =========================
-    // DOCENTE
-    // =========================
+    public boolean StudenteHaRichiestaTirocinioAccettata(
+            String matricola) {
+
+        return tesiDAO.HaRichiestaTirocinioAccettata(
+                matricola
+        );
+    }
+
+    public boolean StudenteHaTesiAccettataPerSeduta(
+            String matricola,
+            int idSeduta) {
+
+        return tesiDAO.HaTesiAccettataPerSeduta(
+                matricola,
+                idSeduta
+        );
+    }
+
+    // OPERAZIONI DOCENTE
 
     public void AggiuntaArgomentoTirocinio(
             Tirocinio tirocinio) {
@@ -213,31 +245,46 @@ public class Controller {
             boolean accetta) {
 
         if (accetta) {
-
-            richiesta.setStato(
-                    StatoRichiesta.ACCETTATA
-            );
-
+            richiesta.setStato(StatoRichiesta.ACCETTATA);
         } else {
-
-            richiesta.setStato(
-                    StatoRichiesta.RIFIUTATA
-            );
+            richiesta.setStato(StatoRichiesta.RIFIUTATA);
         }
 
-        richiestaTirocinioDAO.AggiornaStato(
-                richiesta
+        richiestaTirocinioDAO.AggiornaStato(richiesta);
+    }
+
+    /*
+     * La valutazione richiede l'identificativo del docente
+     * autenticato. Il DAO verifica che sia il relatore.
+     */
+    public void AccettaORifiutaTesi(
+            Tesi tesi,
+            int idDocente) {
+
+        tesiDAO.AggiornaStato(
+                tesi,
+                idDocente
         );
     }
 
-    public void AccettaORifiutaTesi(Tesi tesi) {
+    public List<Tesi> ListaTesiPerRelatore(
+            int idDocente) {
 
-        tesiDAO.AggiornaStato(tesi);
+        return tesiDAO.ListaTesiPerRelatore(idDocente);
     }
 
-    // =========================
-    // COORDINATORE
-    // =========================
+    // OPERAZIONI COORDINATORE
+
+    /*
+     * Il coordinatore consulta soltanto tesi già valutate.
+     */
+    public List<Tesi> ListaTesi() {
+        return tesiDAO.ListaTesiValutate();
+    }
+
+    public List<Tesi> ListaTesiValutate() {
+        return tesiDAO.ListaTesiValutate();
+    }
 
     public void InserisciSedutaLaurea(
             SedutaLaurea seduta) {
@@ -251,16 +298,6 @@ public class Controller {
         return sedutaLaureaDAO.ListaStudenti(seduta);
     }
 
-    public List<Tesi> ListaTesi() {
-
-        return tesiDAO.ListaTesi();
-    }
-
-    public void ControllaTesi(Tesi tesi) {
-
-        tesiDAO.AggiornaStato(tesi);
-    }
-
     public void FormaCommissione(
             Commissione commissione) {
 
@@ -268,7 +305,6 @@ public class Controller {
     }
 
     public List<Commissione> ListaCommissioni() {
-
         return commissioneDAO.ListaCommissioni();
     }
 }

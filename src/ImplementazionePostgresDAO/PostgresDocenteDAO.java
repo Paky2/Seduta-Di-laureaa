@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.sql.SQLException;
 
 public class PostgresDocenteDAO implements DocenteDAO {
 
@@ -111,6 +112,122 @@ public class PostgresDocenteDAO implements DocenteDAO {
                 try {
                     connection.setAutoCommit(true);
                 } catch (Exception ignored) {
+                }
+
+                database.CloseConnection(connection);
+            }
+        }
+    }
+    @Override
+    public void SalvaCoordinatore(Docente coordinatore) {
+
+        String sqlUtente = """
+            INSERT INTO utente
+                (nome, cognome, email, login, password)
+            VALUES (?, ?, ?, ?, ?)
+            RETURNING id
+            """;
+
+        String sqlDocente = """
+            INSERT INTO docente (id_utente)
+            VALUES (?)
+            RETURNING id_docente
+            """;
+
+        String sqlCoordinatore = """
+            INSERT INTO coordinatore (id_docente)
+            VALUES (?)
+            """;
+
+        Connection connection = null;
+
+        try {
+
+            connection = database.GetConnection();
+            connection.setAutoCommit(false);
+
+            int idUtente;
+
+            // 1. Crea l'utente
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sqlUtente)) {
+
+                statement.setString(1, coordinatore.getNome());
+                statement.setString(2, coordinatore.getCognome());
+                statement.setString(3, coordinatore.getEmail());
+                statement.setString(4, coordinatore.getLogin());
+                statement.setString(5, coordinatore.getPassword());
+
+                try (ResultSet rs = statement.executeQuery()) {
+
+                    if (!rs.next()) {
+                        throw new SQLException(
+                                "Impossibile creare l'utente."
+                        );
+                    }
+
+                    idUtente = rs.getInt("id");
+                }
+            }
+
+            int idDocente;
+
+            // 2. Crea il docente e recupera il suo ID
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sqlDocente)) {
+
+                statement.setInt(1, idUtente);
+
+                try (ResultSet rs = statement.executeQuery()) {
+
+                    if (!rs.next()) {
+                        throw new SQLException(
+                                "Impossibile creare il docente."
+                        );
+                    }
+
+                    idDocente = rs.getInt("id_docente");
+                }
+            }
+
+            // 3. Assegna il ruolo di coordinatore
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sqlCoordinatore)) {
+
+                statement.setInt(1, idDocente);
+
+                if (statement.executeUpdate() != 1) {
+                    throw new SQLException(
+                            "Impossibile assegnare il ruolo di coordinatore."
+                    );
+                }
+            }
+
+            // Tutte e tre le operazioni vengono confermate insieme
+            connection.commit();
+
+        } catch (Exception e) {
+
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackError) {
+                    rollbackError.printStackTrace();
+                }
+            }
+
+            throw new RuntimeException(
+                    "Errore durante la registrazione del coordinatore: "
+                            + e.getMessage(),
+                    e
+            );
+
+        } finally {
+
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException ignored) {
                 }
 
                 database.CloseConnection(connection);
